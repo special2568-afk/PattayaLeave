@@ -101,25 +101,27 @@ let DB = { settings:{}, users:[], years:[], leaves:[] };
 const persist = ()=>{};   // no-op (ข้อมูลอยู่บน Google Sheets)
 
 async function call(action, payload){
-  if(!API_URL || API_URL.indexOf('XXXXXX') > -1){
-    Swal.fire({icon:'warning',title:'ยังไม่ได้ตั้งค่า API_URL',
-      html:'กรุณาเปิดไฟล์ <b>index.html</b> แล้วแก้ค่า <code>API_URL</code><br>ให้เป็น URL <code>/exec</code> ของ Google Apps Script',
-      confirmButtonColor:'#0C7C82'});
-    throw new Error('API_URL not configured');
-  }
   try{
     const res = await fetch(API_URL, {
       method : 'POST',
-      headers: { 'Content-Type':'text/plain;charset=utf-8' }, // เลี่ยง CORS preflight
+      headers: { 'Content-Type':'text/plain;charset=utf-8' },
       body   : JSON.stringify({ action, payload: payload || {} }),
       redirect:'follow'
     });
+    
+    // ตรงนี้สำคัญ: ถ้าอ่านค่าไม่ได้ แปลว่า Deploy ไม่เป็น Anyone
     const txt = await res.text();
-    let j; try{ j = JSON.parse(txt); }catch(e){ throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง (ตรวจสอบสิทธิ์ Deploy = Anyone)'); }
+    if (!txt) throw new Error("ไม่ได้รับข้อมูลจากเซิร์ฟเวอร์");
+    
+    let j; 
+    try { j = JSON.parse(txt); } 
+    catch(e) { throw new Error("เซิร์ฟเวอร์ตอบกลับไม่ใช่ JSON: " + txt.substring(0, 50)); }
+    
     if(!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
     return j.data;
   }catch(err){
     spin(false);
+    console.error(err); // ดูรายละเอียดใน F12 > Console
     Swal.fire({icon:'error',title:'เชื่อมต่อฐานข้อมูลไม่สำเร็จ',text:err.message,confirmButtonColor:'#0C7C82'});
     throw err;
   }
