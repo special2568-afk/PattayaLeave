@@ -79,7 +79,7 @@ const fileToB64 = f => new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(
 
 const LEAVE_TYPES = [
   {k:'sick',      t:'ลาป่วย',        color:'bg-coral/15 text-orange2'},
-  {k:'personal',  t:'ลากิจส่วนตัว',  color:'bg-blue2/10 text-blue2'},
+  {k:'personal',  t:'ลาพักร้อน',     color:'bg-blue2/10 text-blue2'},
   {k:'maternity', t:'ลาคลอดบุตร',    color:'bg-grape/10 text-grape'}
 ];
 const typeName = k => (LEAVE_TYPES.find(x=>x.k===k)||{}).t || '-';
@@ -95,7 +95,7 @@ const roleName = k => (ROLES.find(x=>x.k===k)||{}).t || '-';
    1) DATA LAYER — Google Apps Script + Google Sheets
    >>> แก้ API_URL ให้เป็น URL /exec ของคุณ <<<
 ====================================================================== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbw3rQlKllZ5PLLhwTp3xz1b8ey14eEilMh2DEkTVvPRrPAQxHkRrMThNvuYnUvUNmTEnA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxGif8w_3IsqH9mTkGYK8bjtp5j7kKKPT8MzIoDQtxuKZwbm5ytnZgR1m4fYHFrau1_Ww/exec';
 
 let DB = { settings:{}, users:[], years:[], leaves:[] };
 const persist = ()=>{};   // no-op (ข้อมูลอยู่บน Google Sheets)
@@ -919,36 +919,52 @@ function approveModal(l,done){
 ====================================================================== */
 function leaveHTML(l){
   const st=DB.settings||{};
+  const checkbox=checked=>checked
+    ? `<span style="display:inline-block;width:14px;height:14px;border:1.4px solid #0f172a;text-align:center;line-height:12px;font-size:11px;vertical-align:middle;margin-right:4px">✓</span>`
+    : `<span style="display:inline-block;width:14px;height:14px;border:1.4px solid #94a3b8;vertical-align:middle;margin-right:4px"></span>`;
+  const typeChoices=(selected)=>LEAVE_TYPES.map(t=>`${checkbox(t.k===selected)}${t.t}`).join('&nbsp;&nbsp;&nbsp;&nbsp;');
   return `<div class="text-sm leading-relaxed space-y-3">
     <div class="text-center mb-4">
       ${st.logo?`<img src="${esc(st.logo)}" class="w-16 h-16 object-contain mx-auto mb-2">`:''}
-      <h3 class="font-bold text-lg">แบบใบลาป่วย ลากิจส่วนตัว ลาคลอดบุตร</h3></div>
+      <h3 class="font-bold text-lg underline">แบบใบลาป่วย ลาพักร้อน ลาคลอดบุตร</h3></div>
     <div class="text-right">เขียนที่ ${esc(l.writtenAt)}<br>วันที่ ${toTH(l.docDate)}</div>
     <p><b>เรื่อง</b> ${esc(l.subject)}</p>
-    <p><b>เรียน</b> ผู้อำนวยการส่วนปกครอง / หัวหน้าสำนักปลัดเมืองพัทยา</p>
-    <p class="indent-12">ข้าพเจ้า <b>${esc(l.snap?.fullname||'')}</b> ตำแหน่ง ${esc(l.snap?.position||'-')} สังกัด ${esc(l.deptSnap||'')}
-      ขอลา <b>${typeName(l.type)}</b> เนื่องจาก ${esc(l.reason)}
-      ตั้งแต่วันที่ ${toTH(l.startDate)} ถึงวันที่ ${toTH(l.endDate)} มีกำหนด <b>${l.days} วัน</b></p>
-    <p class="indent-12">ข้าพเจ้าได้ลา ${l.lastLeave?`<b>${typeName(l.lastLeave.type)}</b> ครั้งสุดท้ายตั้งแต่วันที่ ${toTH(l.lastLeave.startDate)} ถึงวันที่ ${toTH(l.lastLeave.endDate)} มีกำหนด ${l.lastLeave.days} วัน`:'— ไม่มีประวัติการลาก่อนหน้า —'}
-      ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่ ${esc(l.contact)}</p>
-    <div class="text-center mt-6">
-      <p>ขอแสดงความนับถือ</p>
-      ${l.signature?`<img src="${esc(l.signature)}" class="h-16 mx-auto object-contain">`:'<div class="h-16"></div>'}
-      <p>(${esc(l.snap?.fullname||'')})</p><p class="text-slate-500">${esc(l.snap?.position||'-')}</p></div>
+    <p><b>เรียน</b> ผู้อำนวยการส่วนปกครอง /หัวหน้าสำนักปลัดเมืองพัทยา</p>
+    <p class="indent-12">ข้าพเจ้า <b>${esc(l.snap?.fullname||'')}</b> ตำแหน่ง ${esc(l.snap?.position||'-')} สังกัด ${esc(l.deptSnap||'')}</p>
+    <p>ขอลา &nbsp;${typeChoices(l.type)}</p>
+    <p>เนื่องจาก ${esc(l.reason)}</p>
+    <p>ตั้งแต่วันที่ ${toTH(l.startDate)} ถึงวันที่ ${toTH(l.endDate)} มีกำหนด <b>${l.days} วัน</b></p>
+    <p>ข้าพเจ้าได้ลา &nbsp;${typeChoices(l.lastLeave?l.lastLeave.type:null)}</p>
+    <p>${l.lastLeave?`ครั้งสุดท้ายตั้งแต่วันที่ ${toTH(l.lastLeave.startDate)} ถึงวันที่ ${toTH(l.lastLeave.endDate)} มีกำหนด ${l.lastLeave.days} วัน`:'— ไม่มีประวัติการลาก่อนหน้า —'}</p>
+    <p>ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่ ${esc(l.contact)}</p>
     <table class="w-full border border-slate-300 text-xs mt-4">
       <thead><tr class="bg-slate-100">
-        <th class="border border-slate-300 py-1">ประเภทการลา</th><th class="border border-slate-300 py-1">ลามาแล้ว</th>
-        <th class="border border-slate-300 py-1">ลาครั้งนี้</th><th class="border border-slate-300 py-1">รวมเป็น</th></tr></thead>
+        <th class="border border-slate-300 py-1">ประเภท<br>(ลา)</th>
+        <th class="border border-slate-300 py-1">ลามาแล้ว<br>(วันทำการ)</th>
+        <th class="border border-slate-300 py-1">ลาครั้งนี้<br>(วันทำการ)</th>
+        <th class="border border-slate-300 py-1">รวมเป็น<br>(วันทำการ)</th></tr></thead>
       <tbody>${LEAVE_TYPES.map(t=>{
         const past=(DB.leaves||[]).filter(x=>String(x.userId)===String(l.userId)&&String(x.yearId)===String(l.yearId)&&x.status==='approved'&&x.type===t.k&&String(x.id)!==String(l.id)).reduce((s,x)=>s+x.days,0);
         const now=l.type===t.k?l.days:0;
         return `<tr><td class="border border-slate-300 py-1 px-2">${t.t}</td>
-          <td class="border border-slate-300 py-1 text-center">${past}</td>
+          <td class="border border-slate-300 py-1 text-center">${past||'-'}</td>
           <td class="border border-slate-300 py-1 text-center">${now||'-'}</td>
-          <td class="border border-slate-300 py-1 text-center">${past+now}</td></tr>`;}).join('')}</tbody></table>
+          <td class="border border-slate-300 py-1 text-center">${(past+now)||'-'}</td></tr>`;}).join('')}</tbody></table>
+    <div class="grid grid-cols-2 gap-4 mt-6">
+      <div></div>
+      <div class="text-center">
+        <p>ขอแสดงความนับถือ</p>
+        ${l.signature?`<img src="${esc(l.signature)}" class="h-16 mx-auto object-contain">`:'<div class="h-16"></div>'}
+        <p>(${esc(l.snap?.fullname||'')})</p><p class="text-slate-500">${esc(l.snap?.position||'-')}</p>
+      </div>
+    </div>
+    <p class="mt-4">(ลงชื่อ)........................................ ผู้ตรวจสอบ</p>
     <div class="mt-5 border-t border-dashed border-slate-300 pt-4">
-      <p><b>ความคิดเห็นผู้บังคับบัญชา:</b> ${esc(l.approver?.comment||'-')}</p>
-      <p class="mt-1"><b>คำสั่ง:</b> ${l.status==='approved'?'อนุญาต':l.status==='rejected'?'ไม่อนุญาต':'รออนุญาต'}</p>
+      <p class="font-bold underline">ความเห็นผู้บังคับบัญชา</p>
+      <p class="mt-2">${esc(l.approver?.comment||'.......................................................................................')}</p>
+      <p class="mt-1">(ลงชื่อ)........................................</p>
+      <p class="font-bold underline mt-4">คำสั่ง</p>
+      <p>${checkbox(l.status==='approved')} อนุญาต &nbsp;&nbsp;&nbsp;&nbsp; ${checkbox(l.status==='rejected')} ไม่อนุญาต</p>
       <div class="text-center mt-4">
         ${l.approver?.signature?`<img src="${esc(l.approver.signature)}" class="h-16 mx-auto object-contain">`:'<div class="h-14"></div>'}
         <p>(${esc(l.approver?.name||'.......................................')})</p>
