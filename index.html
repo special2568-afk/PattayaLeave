@@ -95,31 +95,38 @@ const roleName = k => (ROLES.find(x=>x.k===k)||{}).t || '-';
    1) DATA LAYER — Google Apps Script + Google Sheets
    >>> แก้ API_URL ให้เป็น URL /exec ของคุณ <<<
 ====================================================================== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxtJNB-mWw8vmH1l7otXWhcmNYriIaX8R5PkQZaq6BzGF4_nBTaFG4TCjGZ4vt_L1QzhQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbw3rQlKllZ5PLLhwTp3xz1b8ey14eEilMh2DEkTVvPRrPAQxHkRrMThNvuYnUvUNmTEnA/exec';
 
 let DB = { settings:{}, users:[], years:[], leaves:[] };
 const persist = ()=>{};   // no-op (ข้อมูลอยู่บน Google Sheets)
 
-async function call(action, payload){
+async function callOnce_(action, payload){
+  const res = await fetch(API_URL, {
+    method : 'POST',
+    headers: { 'Content-Type':'text/plain;charset=utf-8' },
+    body   : JSON.stringify({ action, payload: payload || {} }),
+    redirect:'follow'
+  });
+  const txt = await res.text();
+  if (!txt) throw new Error("ไม่ได้รับข้อมูลจากเซิร์ฟเวอร์");
+  let j;
+  try { j = JSON.parse(txt); }
+  catch(e) { throw new Error("เซิร์ฟเวอร์ตอบกลับไม่ใช่ JSON: " + txt.substring(0, 50)); }
+  if(!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
+  return j.data;
+}
+// เรียกซ้ำอัตโนมัติเมื่อเจอ error ระดับเครือข่าย (Failed to fetch) ซึ่งมักเป็นปัญหาชั่วคราวจาก
+// การจำกัดจำนวนการเชื่อมต่อพร้อมกันของ Apps Script ไม่ใช่ error จากตัวสคริปต์เอง
+const RETRYABLE = err => err instanceof TypeError; // fetch throws TypeError เมื่อเชื่อมต่อไม่สำเร็จ
+async function call(action, payload, attempt){
+  attempt = attempt || 0;
   try{
-    const res = await fetch(API_URL, {
-      method : 'POST',
-      headers: { 'Content-Type':'text/plain;charset=utf-8' },
-      body   : JSON.stringify({ action, payload: payload || {} }),
-      redirect:'follow'
-    });
-    
-    // ตรงนี้สำคัญ: ถ้าอ่านค่าไม่ได้ แปลว่า Deploy ไม่เป็น Anyone
-    const txt = await res.text();
-    if (!txt) throw new Error("ไม่ได้รับข้อมูลจากเซิร์ฟเวอร์");
-    
-    let j; 
-    try { j = JSON.parse(txt); } 
-    catch(e) { throw new Error("เซิร์ฟเวอร์ตอบกลับไม่ใช่ JSON: " + txt.substring(0, 50)); }
-    
-    if(!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
-    return j.data;
+    return await callOnce_(action, payload);
   }catch(err){
+    if(RETRYABLE(err) && attempt < 2){
+      await sleep(600 * (attempt+1)); // รอ 600ms, 1200ms แล้วลองใหม่
+      return call(action, payload, attempt+1);
+    }
     spin(false);
     console.error(err); // ดูรายละเอียดใน F12 > Console
     Swal.fire({icon:'error',title:'เชื่อมต่อฐานข้อมูลไม่สำเร็จ',text:err.message,confirmButtonColor:'#0C7C82'});
@@ -148,7 +155,14 @@ const api = {
 
   async leaves(f){ DB.leaves = await call('getLeaves', f||{}) || []; return [...DB.leaves]; },
   async saveLeave(l){ return await call('saveLeave',l); },
-  async delLeave(id){ await call('delLeave',{id}); }
+  async delLeave(id){ await call('delLeave',{id}); },
+
+  // รวม settings+years+users+leaves เป็นคำขอเดียว ลดโอกาสเจอ Failed to fetch จากการยิงหลายคำขอพร้อมกัน
+  async dashboardBundle(f){
+    const d = await call('getDashboardBundle', f||{});
+    DB.settings = d.settings||{}; DB.years = d.years||[]; DB.users = d.users||[]; DB.leaves = d.leaves||[];
+    return d;
+  }
 };
 
 const currentYear = ()=> DB.years.find(y=>y.current) || DB.years[0];
@@ -332,7 +346,7 @@ function previewInput(inputEl,imgEl){ inputEl.onchange=async e=>{const f=e.targe
 ====================================================================== */
 async function pageDashboard(c){
   let leaves=[],users=[],yrs=[];
-  try{ [leaves,users,yrs] = await Promise.all([api.leaves(),api.users(),api.years()]); }catch(e){ return; }
+  try{ const d = await api.dashboardBundle(); leaves=d.leaves; users=d.users; yrs=d.years; }catch(e){ return; }
   const cy=currentYear();
   const mine=leaves.filter(l=>String(l.userId)===String(S.user.id));
   const inYear=l=>String(l.yearId)===String(cy?.id);
