@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบการลา ข้าราชการเมืองพัทยา และพนักงานจ้างเมืองพัทยา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sarabun: ['Sarabun', 'sans-serif'] },
+      colors: {
+        brand:  { 50:'#EAF6F6',100:'#D2EDEC',200:'#A8DCDA',300:'#7DCBC8',400:'#35B4B0',500:'#0C7C82',600:'#0A6A6F',700:'#08565A',800:'#064246',900:'#042E31' },
+        teal2:'#26A69A', lime2:'#AED581', amber2:'#FFCA28', coral:'#FF8A65',
+        red2:'#EF5350', grape:'#4A2C6D', red3:'#D32F2F', orange2:'#F57C00', yellow2:'#FBC02D', blue2:'#0288D1'
+      },
+      boxShadow: { soft:'0 6px 24px -8px rgba(12,124,130,.22)', card:'0 2px 12px -4px rgba(15,23,42,.10)' }
+    }
+  }
+}
+</script>
+<style>
+  *{font-family:'Sarabun',sans-serif}
+  .skl{background:linear-gradient(90deg,#eef2f3 25%,#e2e8f0 37%,#eef2f3 63%);background-size:400% 100%;animation:sh 1.2s ease-in-out infinite}
+  @keyframes sh{0%{background-position:100% 50%}100%{background-position:0 50%}}
+  .fade-in{animation:fi .35s ease both}@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#c3d4d6;border-radius:9px}
+  .menu-item.active{background:linear-gradient(90deg,#0C7C82,#35B4B0);color:#fff;box-shadow:0 6px 18px -6px rgba(12,124,130,.6)}
+  .menu-item.active i{color:#fff}
+  input,select,textarea{outline:none}
+  .inp{width:100%;border:1px solid #dbe4e6;border-radius:.75rem;padding:.6rem .85rem;background:#fff;transition:.2s}
+  .inp:focus{border-color:#35B4B0;box-shadow:0 0 0 4px rgba(53,180,176,.15)}
+  .lbl{font-size:.85rem;font-weight:600;color:#475569;margin-bottom:.3rem;display:block}
+  .btn{border-radius:.75rem;padding:.6rem 1.1rem;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:.5rem}
+  .btn-p{background:linear-gradient(135deg,#0C7C82,#35B4B0);color:#fff}.btn-p:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn-g{background:#eef2f3;color:#475569}.btn-g:hover{background:#e2e8f0}
+  .ico-btn{width:34px;height:34px;border-radius:.6rem;display:inline-flex;align-items:center;justify-content:center;transition:.2s}
+  .ico-btn:hover{transform:translateY(-2px)}
+  table.data th{font-weight:600;font-size:.85rem}
+  table.data td,table.data th{white-space:nowrap}
+  @media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;inset:0}}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-700">
+
+<div id="app"></div>
+<div id="modalRoot"></div>
+
+<!-- global spinner -->
+<div id="spinner" class="hidden fixed inset-0 z-[9999] bg-white/60 backdrop-blur-sm flex items-center justify-center">
+  <div class="flex flex-col items-center gap-3">
+    <div class="w-12 h-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
+    <p class="text-brand-600 font-semibold text-sm">กำลังทำงาน...</p>
+  </div>
+</div>
+
+<script>
+/* ======================================================================
+   0) UTIL
+====================================================================== */
+const $  = s => document.querySelector(s);
+const el = (h)=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild;};
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const spin  = on => $('#spinner').classList.toggle('hidden',!on);
+const uid   = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const TH_M  = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const toTH  = d => { if(!d) return '-'; const x=new Date(d); if(isNaN(x)) return '-'; return `${x.getDate()} ${TH_M[x.getMonth()]} ${x.getFullYear()+543}`; };
+const toTHs = d => { if(!d) return '-'; const x=new Date(d); if(isNaN(x)) return '-'; return `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()+543}`; };
+const dayDiff = (a,b)=>{ if(!a||!b) return 0; const d=(new Date(b)-new Date(a))/86400000+1; return d>0?d:0; };
+const esc = s => (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast = (icon,title)=>Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200,timerProgressBar:true});
+const confirmSwal = (title,text,icon='warning',ok='ยืนยัน')=>Swal.fire({title,text,icon,showCancelButton:true,confirmButtonColor:'#0C7C82',cancelButtonColor:'#94a3b8',confirmButtonText:ok,cancelButtonText:'ยกเลิก',reverseButtons:true});
+const fileToB64 = f => new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(f);});
+
+const LEAVE_TYPES = [
+  {k:'sick',      t:'ลาป่วย',        color:'bg-coral/15 text-orange2'},
+  {k:'personal',  t:'ลากิจส่วนตัว',  color:'bg-blue2/10 text-blue2'},
+  {k:'maternity', t:'ลาคลอดบุตร',    color:'bg-grape/10 text-grape'}
+];
+const typeName = k => (LEAVE_TYPES.find(x=>x.k===k)||{}).t || '-';
+const ROLES = [
+  {k:'admin',    t:'ผู้ดูแลระบบ'},
+  {k:'director', t:'ผู้อำนวยการส่วนปกครอง / หัวหน้าสำนักปลัดเมืองพัทยา'},
+  {k:'head',     t:'หัวหน้าฝ่าย'},
+  {k:'employee', t:'ข้าราชการ / พนักงานจ้าง'}
+];
+const roleName = k => (ROLES.find(x=>x.k===k)||{}).t || '-';
+
+/* ======================================================================
+   1) DATA LAYER — Google Apps Script + Google Sheets
+   >>> แก้ API_URL ให้เป็น URL /exec ของคุณ <<<
+====================================================================== */
+const API_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec';
+
+let DB = { settings:{}, users:[], years:[], leaves:[] };
+const persist = ()=>{};   // no-op (ข้อมูลอยู่บน Google Sheets)
+
+async function call(action, payload){
+  if(!API_URL || API_URL.indexOf('XXXXXX') > -1){
+    Swal.fire({icon:'warning',title:'ยังไม่ได้ตั้งค่า API_URL',
+      html:'กรุณาเปิดไฟล์ <b>index.html</b> แล้วแก้ค่า <code>API_URL</code><br>ให้เป็น URL <code>/exec</code> ของ Google Apps Script',
+      confirmButtonColor:'#0C7C82'});
+    throw new Error('API_URL not configured');
+  }
+  try{
+    const res = await fetch(API_URL, {
+      method : 'POST',
+      headers: { 'Content-Type':'text/plain;charset=utf-8' }, // เลี่ยง CORS preflight
+      body   : JSON.stringify({ action, payload: payload || {} }),
+      redirect:'follow'
+    });
+    const txt = await res.text();
+    let j; try{ j = JSON.parse(txt); }catch(e){ throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง (ตรวจสอบสิทธิ์ Deploy = Anyone)'); }
+    if(!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
+    return j.data;
+  }catch(err){
+    spin(false);
+    Swal.fire({icon:'error',title:'เชื่อมต่อฐานข้อมูลไม่สำเร็จ',text:err.message,confirmButtonColor:'#0C7C82'});
+    throw err;
+  }
+}
+
+const api = {
+  async bootstrap(){
+    const d = await call('bootstrap');
+    DB.settings = d.settings || {}; DB.years = d.years || []; return d;
+  },
+  async login(u,p){ return await call('login',{username:u,password:p}); },
+
+  async settings(){ const d = await call('getSettings'); DB.settings=d.settings||{}; DB.years=d.years||[]; return {...DB.settings}; },
+  async saveSettings(s){ DB.settings = await call('saveSettings', s); return DB.settings; },
+
+  async users(){ DB.users = await call('getUsers') || []; return [...DB.users]; },
+  async saveUser(u){ const r = await call('saveUser',u); await api.users(); return r; },
+  async delUser(id){ await call('delUser',{id}); await api.users(); },
+
+  async years(){ DB.years = await call('getYears') || []; return [...DB.years]; },
+  async saveYear(y){ const r = await call('saveYear',y); await api.years(); return r; },
+  async delYear(id){ await call('delYear',{id}); await api.years(); },
+  async setCurrentYear(id){ DB.years = await call('setCurrentYear',{id}) || []; return DB.years; },
+
+  async leaves(f){ DB.leaves = await call('getLeaves', f||{}) || []; return [...DB.leaves]; },
+  async saveLeave(l){ return await call('saveLeave',l); },
+  async delLeave(id){ await call('delLeave',{id}); }
+};
+
+const currentYear = ()=> DB.years.find(y=>y.current) || DB.years[0];
+const roundOf = (date,year)=>{ if(!year||!date) return 1; const d=new Date(date);
+  if(year.r1s&&year.r1e&&d>=new Date(year.r1s)&&d<=new Date(year.r1e))return 1;
+  if(year.r2s&&year.r2e&&d>=new Date(year.r2s)&&d<=new Date(year.r2e))return 2; return 1; };
+
+/* ======================================================================
+   2) STATE / SHELL
+====================================================================== */
+let S = { user:null, page:'dashboard', sidebar:false };
+
+const MENUS = {
+  admin:[
+    {k:'dashboard',i:'fa-gauge-high',t:'แดชบอร์ด'},
+    {k:'settings',i:'fa-sliders',t:'ตั้งค่าระบบ'},
+    {k:'users',i:'fa-users-gear',t:'จัดการผู้ใช้งาน'},
+    {k:'years',i:'fa-calendar-days',t:'จัดการปีงบประมาณ'},
+    {k:'allleaves',i:'fa-list-check',t:'รายการลาทั้งหมด'},
+    {k:'stats',i:'fa-chart-column',t:'สรุปสถิติการลา'}
+  ],
+  director:[
+    {k:'dashboard',i:'fa-gauge-high',t:'แดชบอร์ด'},
+    {k:'profile',i:'fa-user-pen',t:'แก้ไขข้อมูลส่วนตัว'},
+    {k:'approve',i:'fa-stamp',t:'รายการขออนุญาตลา'}
+  ],
+  employee:[
+    {k:'dashboard',i:'fa-gauge-high',t:'แดชบอร์ด'},
+    {k:'profile',i:'fa-user-pen',t:'แก้ไขข้อมูลส่วนตัว'},
+    {k:'request',i:'fa-file-signature',t:'ขออนุญาตลา'},
+    {k:'mylist',i:'fa-folder-open',t:'ข้อมูลขออนุญาตลา'}
+  ]
+};
+MENUS.head = MENUS.director;
+const menuOf = r => MENUS[r] || MENUS.employee;
+
+/* ---------- LOGIN ---------- */
+async function renderLogin(){
+  const st = DB.settings || {};
+  $('#app').innerHTML = `
+  <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-brand-50 via-white to-brand-100">
+    <div class="w-full max-w-4xl bg-white rounded-3xl shadow-soft overflow-hidden grid md:grid-cols-2 fade-in">
+      <div class="p-8 md:p-10 bg-gradient-to-br from-brand-500 to-brand-400 text-white flex flex-col items-center justify-center text-center gap-4">
+        ${st.logo?`<img src="${esc(st.logo)}" class="w-24 h-24 object-contain bg-white/90 rounded-2xl p-2 shadow-lg" loading="lazy">`
+                 :`<div class="w-24 h-24 rounded-2xl bg-white/20 grid place-items-center"><i class="fa-solid fa-city text-4xl"></i></div>`}
+        <h1 class="text-xl md:text-2xl font-extrabold leading-snug">ระบบการลา<br>ข้าราชการเมืองพัทยา<br>และพนักงานจ้างเมืองพัทยา</h1>
+        <div class="w-16 h-1 rounded-full bg-white/50"></div>
+        <p class="font-semibold">${esc(st.cityName||'เมืองพัทยา')}</p>
+        <p class="text-white/90 text-sm">${esc(st.dept||'')} • ${esc(st.office||'')}</p>
+      </div>
+      <div class="p-8 md:p-10 flex flex-col justify-center">
+        <h2 class="text-2xl font-bold text-slate-800">เข้าสู่ระบบ</h2>
+        <p class="text-sm text-slate-400 mb-6">กรอกชื่อผู้ใช้และรหัสผ่านของท่าน</p>
+        <form id="loginForm" class="space-y-4">
+          <div><label class="lbl">ชื่อผู้ใช้ (Username)</label>
+            <div class="relative"><i class="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"></i>
+            <input id="lu" class="inp pl-10" placeholder="username" required></div></div>
+          <div><label class="lbl">รหัสผ่าน (Password)</label>
+            <div class="relative"><i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"></i>
+            <input id="lp" type="password" class="inp pl-10 pr-10" placeholder="••••••" required>
+            <button type="button" id="eye" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-brand-500"><i class="fa-solid fa-eye"></i></button></div></div>
+          <button class="btn btn-p w-full justify-center py-3 mt-2"><i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+        </form>
+        <div class="mt-6 text-[11px] text-slate-400 bg-slate-50 rounded-xl p-3 leading-relaxed">
+          <b>บัญชีตั้งต้น:</b> admin/1234 • director/1234 • user1/1234
+        </div>
+      </div>
+    </div>
+  </div>`;
+  $('#eye').onclick=()=>{const i=$('#lp');i.type=i.type==='password'?'text':'password';};
+  $('#loginForm').onsubmit = async e=>{
+    e.preventDefault(); spin(true);
+    let u=null;
+    try{ u = await api.login($('#lu').value.trim(), $('#lp').value); }catch(err){ return; }
+    spin(false);
+    if(!u) return Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',confirmButtonColor:'#0C7C82'});
+    S.user=u; S.page='dashboard'; toast('success',`ยินดีต้อนรับ ${u.fullname}`); renderShell();
+  };
+}
+
+/* ---------- SHELL ---------- */
+async function renderShell(){
+  const st = DB.settings||{}, m = menuOf(S.user.role);
+  $('#app').innerHTML = `
+  <div class="min-h-screen flex">
+    <div id="ovl" class="fixed inset-0 bg-slate-900/40 z-30 hidden lg:hidden"></div>
+    <aside id="side" class="fixed lg:static z-40 w-72 shrink-0 h-screen bg-white border-r border-slate-100 flex flex-col -translate-x-full lg:translate-x-0 transition-transform duration-300">
+      <div class="p-5 flex items-center gap-3 border-b border-slate-100">
+        ${st.logo?`<img src="${esc(st.logo)}" class="w-11 h-11 object-contain">`:`<div class="w-11 h-11 rounded-xl bg-brand-500 text-white grid place-items-center"><i class="fa-solid fa-city"></i></div>`}
+        <div class="leading-tight"><p class="font-extrabold text-brand-600 text-sm">ระบบการลา</p>
+        <p class="text-[11px] text-slate-400">${esc(st.dept||'')} ${esc(st.office||'')}</p></div>
+      </div>
+      <div class="p-4 m-4 rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100/60 flex items-center gap-3">
+        ${S.user.photo?`<img src="${esc(S.user.photo)}" class="w-12 h-12 rounded-full object-cover ring-2 ring-white">`
+          :`<div class="w-12 h-12 rounded-full bg-brand-400 text-white grid place-items-center font-bold">${esc(String(S.user.fullname).charAt(0))}</div>`}
+        <div class="min-w-0"><p class="font-semibold text-sm truncate">${esc(S.user.fullname)}</p>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-white text-brand-600 font-semibold">${esc(roleName(S.user.role))}</span></div>
+      </div>
+      <nav class="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
+        ${m.map(x=>`<button data-p="${x.k}" class="menu-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-brand-50 transition">
+          <i class="fa-solid ${x.i} w-5 text-center text-brand-400"></i><span>${x.t}</span></button>`).join('')}
+      </nav>
+      <div class="p-3 border-t border-slate-100">
+        <button id="logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red2 hover:bg-red2/10">
+          <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> ออกจากระบบ</button>
+      </div>
+    </aside>
+
+    <div class="flex-1 min-w-0 flex flex-col">
+      <header class="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-100 px-4 lg:px-7 py-3 flex items-center gap-3">
+        <button id="burger" class="lg:hidden ico-btn bg-brand-50 text-brand-600"><i class="fa-solid fa-bars"></i></button>
+        <div class="min-w-0"><h2 id="pageTitle" class="font-bold text-slate-800 truncate">แดชบอร์ด</h2>
+        <p class="text-[11px] text-slate-400 truncate">${esc(st.cityName||'')} • ปีงบประมาณปัจจุบัน ${esc(currentYear()?.name||'-')}</p></div>
+        <div class="ml-auto hidden sm:flex items-center gap-2 text-xs text-slate-400">
+          <i class="fa-regular fa-calendar"></i> ${toTH(new Date())}
+        </div>
+      </header>
+      <main id="content" class="flex-1 p-4 lg:p-7"></main>
+      <footer class="px-6 py-5 text-center text-xs text-slate-400 border-t border-slate-100 bg-white">
+        ระบบการลา ข้าราชการเมืองพัทยาและพนักงานจ้าง • ${esc(st.dept||'')} ${esc(st.office||'')}
+      </footer>
+    </div>
+  </div>`;
+
+  const side=$('#side'), ovl=$('#ovl');
+  const openMenu=o=>{side.classList.toggle('-translate-x-full',!o);ovl.classList.toggle('hidden',!o);};
+  $('#burger').onclick=()=>openMenu(true); ovl.onclick=()=>openMenu(false);
+  document.querySelectorAll('.menu-item').forEach(b=>b.onclick=()=>{S.page=b.dataset.p;openMenu(false);route();});
+  $('#logout').onclick=async()=>{ const r=await confirmSwal('ออกจากระบบ?','ต้องการออกจากระบบใช่หรือไม่','question','ออกจากระบบ');
+    if(r.isConfirmed){spin(true);await sleep(300);spin(false);S.user=null;renderLogin();} };
+  route();
+}
+
+function route(){
+  const m=menuOf(S.user.role).find(x=>x.k===S.page)||menuOf(S.user.role)[0];
+  S.page=m.k; $('#pageTitle').textContent=m.t;
+  document.querySelectorAll('.menu-item').forEach(b=>b.classList.toggle('active',b.dataset.p===S.page));
+  const c=$('#content'); c.innerHTML=skeletonPage();
+  const map={dashboard:pageDashboard,settings:pageSettings,users:pageUsers,years:pageYears,allleaves:pageAllLeaves,
+             stats:pageStats,profile:pageProfile,request:pageRequest,mylist:pageMyList,approve:pageApprove};
+  (map[S.page]||pageDashboard)(c);
+}
+
+/* ---------- SKELETON ---------- */
+const skeletonPage = ()=>`<div class="space-y-4">
+  <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">${'<div class="h-28 rounded-2xl skl"></div>'.repeat(4)}</div>
+  <div class="h-64 rounded-2xl skl"></div></div>`;
+const skeletonRows=(r,c)=>Array.from({length:r}).map(()=>`<tr>${Array.from({length:c}).map(()=>'<td class="px-4 py-3"><div class="h-4 rounded skl"></div></td>').join('')}</tr>`).join('');
+
+/* ---------- UI helpers ---------- */
+const card=(t,v,i,color)=>`<div class="bg-white rounded-2xl p-5 shadow-card flex items-center gap-4 fade-in">
+  <div class="w-12 h-12 rounded-xl grid place-items-center text-white" style="background:${color}"><i class="fa-solid ${i}"></i></div>
+  <div><p class="text-xs text-slate-400">${t}</p><p class="text-2xl font-extrabold text-slate-800">${v}</p></div></div>`;
+const statusBadge=s=>({pending:`<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber2/20 text-orange2"><i class="fa-regular fa-clock"></i> รออนุญาต</span>`,
+  approved:`<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-teal2/15 text-teal2"><i class="fa-solid fa-check"></i> อนุญาต</span>`,
+  rejected:`<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red3/10 text-red3"><i class="fa-solid fa-xmark"></i> ไม่อนุญาต</span>`}[s]||'-');
+const typeBadge=k=>{const t=LEAVE_TYPES.find(x=>x.k===k)||{};return `<span class="px-2.5 py-1 rounded-full text-xs font-semibold ${t.color||''}">${t.t||'-'}</span>`;};
+const box=(title,icon,body,extra='')=>`<section class="bg-white rounded-2xl shadow-card fade-in overflow-hidden">
+  <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2 flex-wrap">
+    <i class="fa-solid ${icon} text-brand-500"></i><h3 class="font-bold text-slate-800">${title}</h3><div class="ml-auto">${extra}</div></div>
+  <div>${body}</div></section>`;
+
+function openModal(title,body,footer='',size='max-w-2xl'){
+  const m=el(`<div class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" data-close></div>
+    <div class="relative w-full ${size} bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col fade-in">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+        <h3 class="font-bold text-slate-800">${title}</h3>
+        <button class="ml-auto ico-btn bg-slate-100 text-slate-500" data-close><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="p-5 overflow-y-auto">${body}</div>
+      ${footer?`<div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">${footer}</div>`:''}
+    </div></div>`);
+  $('#modalRoot').appendChild(m);
+  m.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>m.remove());
+  return m;
+}
+function previewInput(inputEl,imgEl){ inputEl.onchange=async e=>{const f=e.target.files[0];if(!f)return;imgEl.src=await fileToB64(f);imgEl.classList.remove('hidden');}; }
+
+/* ======================================================================
+   3) DASHBOARD
+====================================================================== */
+async function pageDashboard(c){
+  let leaves=[],users=[],yrs=[];
+  try{ [leaves,users,yrs] = await Promise.all([api.leaves(),api.users(),api.years()]); }catch(e){ return; }
+  const cy=currentYear();
+  const mine=leaves.filter(l=>String(l.userId)===String(S.user.id));
+  const inYear=l=>String(l.yearId)===String(cy?.id);
+  let cards='';
+  if(S.user.role==='admin'){
+    cards=[card('ผู้ใช้งานทั้งหมด',users.length,'fa-users','#0C7C82'),
+      card('ใบลาทั้งหมด',leaves.length,'fa-file-lines','#35B4B0'),
+      card('รออนุญาต',leaves.filter(l=>l.status==='pending').length,'fa-clock','#FFCA28'),
+      card('ปีงบประมาณ',yrs.length,'fa-calendar','#4A2C6D')].join('');
+  } else if(S.user.role==='employee'){
+    const ap=mine.filter(l=>l.status==='approved'&&inYear(l));
+    cards=[card('ใบลาของฉัน',mine.length,'fa-file-lines','#0C7C82'),
+      card('รออนุญาต',mine.filter(l=>l.status==='pending').length,'fa-clock','#FFCA28'),
+      card('อนุญาตแล้ว',mine.filter(l=>l.status==='approved').length,'fa-check','#26A69A'),
+      card(`วันลารวม ปี ${cy?.name||''}`,ap.reduce((s,l)=>s+l.days,0),'fa-calendar-check','#FF8A65')].join('');
+  } else {
+    cards=[card('รออนุญาต',leaves.filter(l=>l.status==='pending').length,'fa-clock','#FFCA28'),
+      card('อนุญาตแล้ว',leaves.filter(l=>l.status==='approved').length,'fa-check','#26A69A'),
+      card('ไม่อนุญาต',leaves.filter(l=>l.status==='rejected').length,'fa-xmark','#D32F2F'),
+      card('ใบลาทั้งหมด',leaves.length,'fa-file-lines','#0C7C82')].join('');
+  }
+  const list = (S.user.role==='employee'?mine:leaves).slice(0,8);
+  c.innerHTML=`<div class="space-y-5">
+    <div class="rounded-2xl p-6 bg-gradient-to-r from-brand-500 to-brand-400 text-white shadow-soft fade-in">
+      <p class="text-white/80 text-sm">สวัสดี</p>
+      <h2 class="text-2xl font-extrabold">${esc(S.user.fullname)}</h2>
+      <p class="text-white/90 text-sm mt-1">${esc(S.user.position||'-')} • ${esc(DB.settings.dept||'')} ${esc(DB.settings.office||'')}</p>
+    </div>
+    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">${cards}</div>
+    ${box('รายการลาล่าสุด','fa-clock-rotate-left',`<div class="overflow-x-auto"><table class="data w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500"><tr>
+        <th class="px-4 py-3 text-left">ชื่อ-นามสกุล</th><th class="px-4 py-3 text-left">ประเภท</th>
+        <th class="px-4 py-3 text-left">วันที่ลา</th><th class="px-4 py-3 text-center">วัน</th><th class="px-4 py-3 text-center">สถานะ</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${list.length?list.map(l=>`<tr class="hover:bg-slate-50/70">
+        <td class="px-4 py-3 font-medium">${esc(l.snap?.fullname||'')}</td><td class="px-4 py-3">${typeBadge(l.type)}</td>
+        <td class="px-4 py-3">${toTHs(l.startDate)} - ${toTHs(l.endDate)}</td>
+        <td class="px-4 py-3 text-center font-semibold">${l.days}</td>
+        <td class="px-4 py-3 text-center">${statusBadge(l.status)}</td></tr>`).join('')
+        :`<tr><td colspan="5" class="px-4 py-10 text-center text-slate-400"><i class="fa-regular fa-folder-open text-2xl block mb-2"></i>ยังไม่มีข้อมูล</td></tr>`}</tbody>
+    </table></div>`)}
+  </div>`;
+}
+
+/* ======================================================================
+   4) ADMIN : SETTINGS
+====================================================================== */
+async function pageSettings(c){
+  let st; try{ st = await api.settings(); }catch(e){ return; }
+  c.innerHTML=box('ตั้งค่าระบบ','fa-sliders',`<form id="fSet" class="p-5 grid md:grid-cols-2 gap-5">
+    <div><label class="lbl">ชื่อเมืองพัทยา</label><input id="sCity" class="inp" value="${esc(st.cityName)}" required></div>
+    <div><label class="lbl">ชื่อสำนัก</label><input id="sOffice" class="inp" value="${esc(st.office)}" required></div>
+    <div><label class="lbl">ชื่อสังกัด (ส่วน/ฝ่าย)</label><input id="sDept" class="inp" value="${esc(st.dept)}" required></div>
+    <div><label class="lbl">โลโก้เมืองพัทยา (URL)</label><input id="sLogo" class="inp" value="${esc(st.logo)}"></div>
+    <div class="md:col-span-2"><label class="lbl">อัพโหลดรูปโลโก้ฝ่าย <span class="text-slate-300 font-normal">(ไม่บังคับ)</span></label>
+      <div class="flex items-center gap-4">
+        <input id="sFile" type="file" accept="image/*" class="inp flex-1">
+        <img id="sPrev" src="${esc(st.deptLogo)}" class="${st.deptLogo?'':'hidden'} w-20 h-20 object-contain rounded-xl border border-slate-100 bg-slate-50 p-1">
+      </div></div>
+    <div class="md:col-span-2 flex justify-end"><button class="btn btn-p"><i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า</button></div>
+  </form>`);
+  previewInput($('#sFile'),$('#sPrev'));
+  $('#fSet').onsubmit=async e=>{e.preventDefault();spin(true);
+    try{
+      await api.saveSettings({cityName:$('#sCity').value,office:$('#sOffice').value,dept:$('#sDept').value,logo:$('#sLogo').value,
+        deptLogo:$('#sPrev').src.startsWith('data:')?$('#sPrev').src:st.deptLogo});
+    }catch(err){ return; }
+    spin(false);Swal.fire({icon:'success',title:'บันทึกสำเร็จ',confirmButtonColor:'#0C7C82'}).then(()=>renderShell());};
+}
+
+/* ======================================================================
+   5) ADMIN : USERS
+====================================================================== */
+async function pageUsers(c){
+  c.innerHTML=box('จัดการผู้ใช้งาน','fa-users-gear',
+    `<div class="overflow-x-auto"><table class="data w-full text-sm"><thead class="bg-slate-50 text-slate-500"><tr>
+      <th class="px-4 py-3 w-14 text-center">ลำดับ</th><th class="px-4 py-3 text-left">ผู้ใช้งาน</th>
+      <th class="px-4 py-3 text-left">ชื่อ-นามสกุล</th><th class="px-4 py-3 text-left">ตำแหน่ง</th>
+      <th class="px-4 py-3 text-center">สิทธิ์</th><th class="px-4 py-3 text-center w-28">จัดการ</th></tr></thead>
+      <tbody id="uBody" class="divide-y divide-slate-100">${skeletonRows(5,6)}</tbody></table></div>`,
+    `<button id="addU" class="btn btn-p text-sm"><i class="fa-solid fa-plus"></i> เพิ่มผู้ใช้งาน</button>`);
+  const load=async()=>{
+    let us=[]; try{ us=await api.users(); }catch(e){ return; }
+    $('#uBody').innerHTML=us.length?us.map((u,i)=>`<tr class="hover:bg-slate-50/70">
+      <td class="px-4 py-3 text-center text-slate-400">${i+1}</td>
+      <td class="px-4 py-3"><div class="flex items-center gap-2">
+        ${u.photo?`<img src="${esc(u.photo)}" class="w-9 h-9 rounded-full object-cover" loading="lazy">`
+          :`<div class="w-9 h-9 rounded-full bg-brand-100 text-brand-600 grid place-items-center font-bold">${esc(String(u.fullname).charAt(0))}</div>`}
+        <span class="font-mono text-xs text-slate-500">${esc(u.username)}</span></div></td>
+      <td class="px-4 py-3 font-medium">${esc(u.fullname)}</td>
+      <td class="px-4 py-3 text-slate-500">${esc(u.position||'-')}</td>
+      <td class="px-4 py-3 text-center"><span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-600">${esc(roleName(u.role))}</span></td>
+      <td class="px-4 py-3"><div class="flex justify-center gap-1">
+        <button class="ico-btn bg-amber2/20 text-orange2" data-ed="${u.id}"><i class="fa-solid fa-pen"></i></button>
+        <button class="ico-btn bg-red3/10 text-red3" data-del="${u.id}"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')
+      :`<tr><td colspan="6" class="px-4 py-10 text-center text-slate-400">ยังไม่มีผู้ใช้งาน</td></tr>`;
+    $('#uBody').querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>formUser(us.find(x=>String(x.id)===b.dataset.ed),load));
+    $('#uBody').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+      const r=await confirmSwal('ยืนยันการลบ?','ข้อมูลผู้ใช้งานนี้จะถูกลบถาวร','warning','ลบเลย');
+      if(r.isConfirmed){spin(true);try{await api.delUser(b.dataset.del);}catch(e){return;}spin(false);toast('success','ลบข้อมูลสำเร็จ');load();}});
+  };
+  $('#addU').onclick=()=>formUser(null,load); load();
+}
+function formUser(u,done){
+  const m=openModal(u?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน',`
+    <form id="fU" class="grid md:grid-cols-2 gap-4">
+      <div><label class="lbl">Username</label><input id="uu" class="inp" value="${esc(u?.username||'')}" required></div>
+      <div><label class="lbl">Password</label><input id="up" class="inp" value="${esc(u?.password||'')}" required></div>
+      <div class="md:col-span-2"><label class="lbl">ชื่อ-นามสกุล</label><input id="un" class="inp" value="${esc(u?.fullname||'')}" required></div>
+      <div><label class="lbl">สิทธิ์การใช้งาน</label><select id="ur" class="inp">${ROLES.map(r=>`<option value="${r.k}" ${u?.role===r.k?'selected':''}>${r.t}</option>`).join('')}</select></div>
+      <div id="posWrap"><label class="lbl">ตำแหน่ง</label><input id="upos" class="inp" value="${esc(u?.position||'')}"></div>
+      <div class="md:col-span-2"><label class="lbl">รูปโปรไฟล์ <span class="text-slate-300 font-normal">(ไม่บังคับ)</span></label>
+        <div class="flex items-center gap-3"><input id="uf" type="file" accept="image/*" class="inp flex-1">
+        <img id="upv" src="${esc(u?.photo||'')}" class="${u?.photo?'':'hidden'} w-16 h-16 rounded-xl object-cover border"></div></div>
+    </form>`,
+    `<button class="btn btn-g" data-close>ยกเลิก</button><button class="btn btn-p" id="okU"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>`);
+  previewInput(m.querySelector('#uf'),m.querySelector('#upv'));
+  const tog=()=>m.querySelector('#posWrap').style.display = m.querySelector('#ur').value==='admin'?'none':'block';
+  m.querySelector('#ur').onchange=tog; tog();
+  m.querySelector('#okU').onclick=async()=>{
+    const f=m.querySelector('#fU'); if(!f.reportValidity())return;
+    spin(true);
+    try{
+      await api.saveUser({id:u?.id,username:m.querySelector('#uu').value.trim(),password:m.querySelector('#up').value,
+        fullname:m.querySelector('#un').value.trim(),role:m.querySelector('#ur').value,position:m.querySelector('#upos').value.trim(),
+        photo:m.querySelector('#upv').src.startsWith('data:')?m.querySelector('#upv').src:(u?.photo||''),signature:u?.signature||''});
+    }catch(e){ return; }
+    spin(false);m.remove();toast('success','บันทึกข้อมูลสำเร็จ');done();};
+}
+
+/* ======================================================================
+   6) ADMIN : FISCAL YEARS
+====================================================================== */
+async function pageYears(c){
+  c.innerHTML=box('จัดการปีงบประมาณ','fa-calendar-days',
+    `<div class="overflow-x-auto"><table class="data w-full text-sm"><thead class="bg-slate-50 text-slate-500"><tr>
+      <th class="px-4 py-3 w-14 text-center">ลำดับ</th><th class="px-4 py-3 text-left">ชื่อปีงบประมาณ</th>
+      <th class="px-4 py-3 text-left">รอบที่ 1</th><th class="px-4 py-3 text-left">รอบที่ 2</th>
+      <th class="px-4 py-3 text-center">สถานะ</th><th class="px-4 py-3 text-center w-36">จัดการ</th></tr></thead>
+      <tbody id="yBody" class="divide-y divide-slate-100">${skeletonRows(4,6)}</tbody></table></div>`,
+    `<button id="addY" class="btn btn-p text-sm"><i class="fa-solid fa-plus"></i> เพิ่มปีงบประมาณ</button>`);
+  const load=async()=>{
+    let ys=[]; try{ ys=await api.years(); }catch(e){ return; }
+    $('#yBody').innerHTML=ys.length?ys.map((y,i)=>`<tr class="hover:bg-slate-50/70">
+      <td class="px-4 py-3 text-center text-slate-400">${i+1}</td>
+      <td class="px-4 py-3 font-bold text-brand-600">${esc(y.name)}</td>
+      <td class="px-4 py-3">${toTHs(y.r1s)} - ${toTHs(y.r1e)}</td>
+      <td class="px-4 py-3">${toTHs(y.r2s)} - ${toTHs(y.r2e)}</td>
+      <td class="px-4 py-3 text-center">${y.current?`<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-teal2/15 text-teal2"><i class="fa-solid fa-star"></i> ปีปัจจุบัน</span>`
+        :`<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-400">ไม่ใช่ปีปัจจุบัน</span>`}</td>
+      <td class="px-4 py-3"><div class="flex justify-center gap-1">
+        <button class="ico-btn ${y.current?'bg-slate-100 text-slate-300':'bg-teal2/15 text-teal2'}" ${y.current?'disabled':''} data-cur="${y.id}" title="ตั้งเป็นปีปัจจุบัน"><i class="fa-solid fa-circle-check"></i></button>
+        <button class="ico-btn bg-amber2/20 text-orange2" data-ed="${y.id}"><i class="fa-solid fa-pen"></i></button>
+        <button class="ico-btn bg-red3/10 text-red3" data-del="${y.id}"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')
+      :`<tr><td colspan="6" class="px-4 py-10 text-center text-slate-400">ยังไม่มีปีงบประมาณ</td></tr>`;
+    $('#yBody').querySelectorAll('[data-cur]').forEach(b=>b.onclick=async()=>{
+      const r=await confirmSwal('ตั้งเป็นปีงบประมาณปัจจุบัน?','ระบบจะใช้ปีนี้ในการบันทึกใบลาใหม่','question','ยืนยัน');
+      if(r.isConfirmed){spin(true);try{await api.setCurrentYear(b.dataset.cur);}catch(e){return;}spin(false);toast('success','ตั้งค่าสำเร็จ');load();}});
+    $('#yBody').querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>formYear(ys.find(x=>String(x.id)===b.dataset.ed),load));
+    $('#yBody').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+      const r=await confirmSwal('ยืนยันการลบ?','ลบปีงบประมาณนี้ถาวร','warning','ลบเลย');
+      if(r.isConfirmed){spin(true);try{await api.delYear(b.dataset.del);}catch(e){return;}spin(false);toast('success','ลบสำเร็จ');load();}});
+  };
+  $('#addY').onclick=()=>formYear(null,load); load();
+}
+function formYear(y,done){
+  const m=openModal(y?'แก้ไขปีงบประมาณ':'เพิ่มปีงบประมาณ',`
+    <form id="fY" class="space-y-4">
+      <div><label class="lbl">ชื่อปีงบประมาณ (พ.ศ.)</label><input id="yn" class="inp" value="${esc(y?.name||'')}" placeholder="เช่น 2568" required></div>
+      <div class="rounded-2xl border border-slate-100 p-4"><p class="font-semibold text-brand-600 mb-3 text-sm"><i class="fa-solid fa-1"></i> รอบที่ 1</p>
+        <div class="grid sm:grid-cols-2 gap-3"><div><label class="lbl">วันที่เริ่มต้น</label><input id="y1s" type="date" class="inp" value="${y?.r1s||''}" required></div>
+        <div><label class="lbl">วันที่สิ้นสุด</label><input id="y1e" type="date" class="inp" value="${y?.r1e||''}" required></div></div></div>
+      <div class="rounded-2xl border border-slate-100 p-4"><p class="font-semibold text-brand-600 mb-3 text-sm"><i class="fa-solid fa-2"></i> รอบที่ 2</p>
+        <div class="grid sm:grid-cols-2 gap-3"><div><label class="lbl">วันที่เริ่มต้น</label><input id="y2s" type="date" class="inp" value="${y?.r2s||''}" required></div>
+        <div><label class="lbl">วันที่สิ้นสุด</label><input id="y2e" type="date" class="inp" value="${y?.r2e||''}" required></div></div></div>
+      <label class="flex items-center gap-2 text-sm"><input id="ycur" type="checkbox" class="w-4 h-4 accent-brand-500" ${y?.current?'checked':''}> ตั้งเป็นปีงบประมาณปัจจุบัน</label>
+    </form>`,
+    `<button class="btn btn-g" data-close>ยกเลิก</button><button class="btn btn-p" id="okY"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>`);
+  m.querySelector('#okY').onclick=async()=>{
+    if(!m.querySelector('#fY').reportValidity())return; spin(true);
+    const data={id:y?.id,name:m.querySelector('#yn').value.trim(),r1s:m.querySelector('#y1s').value,r1e:m.querySelector('#y1e').value,
+      r2s:m.querySelector('#y2s').value,r2e:m.querySelector('#y2e').value};
+    try{
+      const saved = await api.saveYear(data);
+      if(m.querySelector('#ycur').checked && saved?.id) await api.setCurrentYear(saved.id);
+    }catch(e){ return; }
+    spin(false);m.remove();toast('success','บันทึกสำเร็จ');done();};
+}
+
+/* ======================================================================
+   7) ADMIN : ALL LEAVES
+====================================================================== */
+async function pageAllLeaves(c){
+  let users=[],years=[];
+  try{ [users,years] = await Promise.all([api.users(),api.years()]); }catch(e){ return; }
+  c.innerHTML=`<div class="space-y-4">
+    ${box('กรองข้อมูล','fa-filter',`<div class="p-5 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div><label class="lbl">ชื่อ-นามสกุล</label><select id="f1" class="inp"><option value="">ทั้งหมด</option>${users.filter(u=>u.role!=='admin').map(u=>`<option value="${u.id}">${esc(u.fullname)}</option>`).join('')}</select></div>
+      <div><label class="lbl">ปีงบประมาณ</label><select id="f2" class="inp"><option value="">ทั้งหมด</option>${years.map(y=>`<option value="${y.id}">${esc(y.name)}</option>`).join('')}</select></div>
+      <div><label class="lbl">รอบที่</label><select id="f3" class="inp"><option value="">ทั้งหมด</option><option value="1">รอบที่ 1</option><option value="2">รอบที่ 2</option></select></div>
+      <div><label class="lbl">ประเภท</label><select id="f4" class="inp"><option value="">ทั้งหมด</option>${LEAVE_TYPES.map(t=>`<option value="${t.k}">${t.t}</option>`).join('')}</select></div>
+      <div><label class="lbl">สถานะ</label><select id="f5" class="inp"><option value="">ทั้งหมด</option><option value="pending">รออนุญาต</option><option value="approved">อนุญาต</option><option value="rejected">ไม่อนุญาต</option></select></div>
+    </div>`)}
+    ${box('รายการลาทั้งหมด','fa-list-check',`<div class="overflow-x-auto"><table class="data w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500"><tr>
+        <th class="px-4 py-3 w-14 text-center">ลำดับ</th><th class="px-4 py-3 text-left">ชื่อ-นามสกุล</th>
+        <th class="px-4 py-3 text-center">รอบที่/ปีงบฯ</th><th class="px-4 py-3 text-center">ประเภท</th>
+        <th class="px-4 py-3 text-left">วันที่ลา</th><th class="px-4 py-3 text-center">วัน</th>
+        <th class="px-4 py-3 text-center">สถานะ</th><th class="px-4 py-3 text-center w-36">จัดการ</th></tr></thead>
+      <tbody id="alBody" class="divide-y divide-slate-100">${skeletonRows(6,8)}</tbody></table></div>`)}
+  </div>`;
+  const load=async()=>{
+    $('#alBody').innerHTML=skeletonRows(6,8);
+    const f={userId:$('#f1').value,yearId:$('#f2').value,round:$('#f3').value,type:$('#f4').value,status:$('#f5').value};
+    let rows=[]; try{ rows=await api.leaves(f); }catch(e){ return; }
+    $('#alBody').innerHTML=rows.length?rows.map((l,i)=>`<tr class="hover:bg-slate-50/70">
+      <td class="px-4 py-3 text-center text-slate-400">${i+1}</td>
+      <td class="px-4 py-3 font-medium">${esc(l.snap?.fullname||'')}</td>
+      <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-lg bg-brand-50 text-brand-600 text-xs font-semibold">${l.round}/${esc(l.yearName)}</span></td>
+      <td class="px-4 py-3 text-center">${typeBadge(l.type)}</td>
+      <td class="px-4 py-3">${toTHs(l.startDate)} - ${toTHs(l.endDate)}</td>
+      <td class="px-4 py-3 text-center font-semibold">${l.days}</td>
+      <td class="px-4 py-3 text-center">${statusBadge(l.status)}</td>
+      <td class="px-4 py-3"><div class="flex justify-center gap-1">
+        <button class="ico-btn bg-blue2/10 text-blue2" data-view="${l.id}"><i class="fa-solid fa-eye"></i></button>
+        <button class="ico-btn bg-brand-50 text-brand-600" data-print="${l.id}"><i class="fa-solid fa-print"></i></button>
+        <button class="ico-btn bg-red3/10 text-red3" data-del="${l.id}"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')
+      :`<tr><td colspan="8" class="px-4 py-12 text-center text-slate-400"><i class="fa-regular fa-folder-open text-2xl block mb-2"></i>ไม่พบข้อมูล</td></tr>`;
+    bindLeaveRowActions($('#alBody'),rows,load);
+  };
+  ['#f1','#f2','#f3','#f4','#f5'].forEach(s=>$(s).onchange=load); load();
+}
+function bindLeaveRowActions(scope,rows,reload){
+  scope.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>viewLeave(rows.find(x=>String(x.id)===b.dataset.view)));
+  scope.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>printLeave(rows.find(x=>String(x.id)===b.dataset.print)));
+  scope.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    const r=await confirmSwal('ยืนยันการลบใบลา?','ข้อมูลจะถูกลบถาวร','warning','ลบเลย');
+    if(r.isConfirmed){spin(true);try{await api.delLeave(b.dataset.del);}catch(e){return;}spin(false);toast('success','ลบสำเร็จ');reload();}});
+}
+
+/* ======================================================================
+   8) ADMIN : STATS
+====================================================================== */
+async function pageStats(c){
+  let years=[]; try{ years=await api.years(); }catch(e){ return; }
+  c.innerHTML=box('สรุปสถิติการลา','fa-chart-column',`<div class="p-5">
+    <div class="flex flex-wrap items-end gap-3">
+      <div class="flex-1 min-w-[200px]"><label class="lbl">เลือกปีงบประมาณ</label>
+        <select id="stY" class="inp">${years.map(y=>`<option value="${y.id}" ${y.current?'selected':''}>ปีงบประมาณ ${esc(y.name)}</option>`).join('')}</select></div>
+      <button id="stGo" class="btn btn-p"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
+    </div>
+    <div id="stWrap" class="mt-5 text-center text-slate-400 py-12 border border-dashed border-slate-200 rounded-2xl">
+      <i class="fa-solid fa-chart-simple text-3xl block mb-2"></i>เลือกปีงบประมาณแล้วกด “โหลดข้อมูล”</div>
+  </div>`);
+  $('#stGo').onclick=async()=>{
+    const yid=$('#stY').value, w=$('#stWrap');
+    w.innerHTML=`<div class="space-y-2">${'<div class="h-9 rounded skl"></div>'.repeat(6)}</div>`;
+    spin(true);
+    let rows=[];
+    try{ rows = await call('getStats',{yearId:yid}) || []; }catch(e){ spin(false); return; }
+    spin(false);
+    const cell=v=>`<td class="px-3 py-3 text-center">${v||'-'}</td>`;
+    w.innerHTML=`<div class="overflow-x-auto border border-slate-100 rounded-2xl">
+      <table class="data w-full text-sm">
+        <thead class="bg-brand-500 text-white">
+          <tr><th rowspan="2" class="px-3 py-2 border-r border-white/20 w-14">ลำดับ</th>
+            <th rowspan="2" class="px-3 py-2 border-r border-white/20 text-left">ชื่อ-นามสกุล</th>
+            <th colspan="2" class="px-3 py-2 border-r border-white/20">ป่วย</th>
+            <th colspan="2" class="px-3 py-2 border-r border-white/20">กิจ</th>
+            <th colspan="2" class="px-3 py-2 border-r border-white/20">ลาคลอด</th>
+            <th colspan="2" class="px-3 py-2">รวม</th></tr>
+          <tr class="bg-brand-400 text-white text-xs">
+            ${'<th class="px-3 py-1.5">ครั้ง</th><th class="px-3 py-1.5 border-r border-white/20">วัน</th>'.repeat(3)}
+            <th class="px-3 py-1.5">ครั้ง</th><th class="px-3 py-1.5">วัน</th></tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          ${rows.length?rows.map((r,i)=>`<tr class="hover:bg-brand-50/40">
+            <td class="px-3 py-3 text-center text-slate-400">${i+1}</td>
+            <td class="px-3 py-3 font-medium">${esc(r.fullname)}<div class="text-[11px] text-slate-400">${esc(r.position||'')}</div></td>
+            ${cell(r.sick.c)}${cell(r.sick.d)}${cell(r.personal.c)}${cell(r.personal.d)}${cell(r.maternity.c)}${cell(r.maternity.d)}
+            <td class="px-3 py-3 text-center font-bold text-brand-600">${r.total.c||'-'}</td>
+            <td class="px-3 py-3 text-center font-bold text-brand-600">${r.total.d||'-'}</td></tr>`).join('')
+          :`<tr><td colspan="10" class="px-3 py-10 text-center text-slate-400">ไม่พบข้อมูล</td></tr>`}
+        </tbody>
+        <tfoot class="bg-slate-50 font-bold"><tr><td colspan="2" class="px-3 py-3 text-right">รวมทั้งหมด</td>
+          ${['sick','personal','maternity'].map(k=>`<td class="px-3 py-3 text-center">${rows.reduce((s,r)=>s+r[k].c,0)}</td><td class="px-3 py-3 text-center">${rows.reduce((s,r)=>s+r[k].d,0)}</td>`).join('')}
+          <td class="px-3 py-3 text-center text-brand-600">${rows.reduce((s,r)=>s+r.total.c,0)}</td>
+          <td class="px-3 py-3 text-center text-brand-600">${rows.reduce((s,r)=>s+r.total.d,0)}</td></tr></tfoot>
+      </table></div>`;
+  };
+}
+
+/* ======================================================================
+   9) PROFILE (employee / director)
+====================================================================== */
+async function pageProfile(c){
+  const u=S.user;
+  c.innerHTML=box('แก้ไขข้อมูลส่วนตัว','fa-user-pen',`<form id="fP" class="p-5 grid md:grid-cols-2 gap-5">
+    <div><label class="lbl">Username</label><input id="pu" class="inp" value="${esc(u.username)}" required></div>
+    <div><label class="lbl">Password</label><input id="pp" class="inp" value="${esc(u.password)}" required></div>
+    <div><label class="lbl">ชื่อ-นามสกุล</label><input id="pn" class="inp" value="${esc(u.fullname)}" required></div>
+    <div><label class="lbl">ตำแหน่ง</label><input id="ppos" class="inp" value="${esc(u.position||'')}" placeholder="กรอกตำแหน่ง" required></div>
+    <div><label class="lbl">รูปโปรไฟล์ <span class="text-slate-300 font-normal">(ไม่บังคับ)</span></label>
+      <div class="flex items-center gap-3"><input id="pf" type="file" accept="image/*" class="inp flex-1">
+      <img id="ppv" src="${esc(u.photo||'')}" class="${u.photo?'':'hidden'} w-16 h-16 rounded-full object-cover border"></div></div>
+    <div><label class="lbl">รูปลายเซ็น <span class="text-slate-300 font-normal">(ไม่บังคับ)</span></label>
+      <div class="flex items-center gap-3"><input id="sf" type="file" accept="image/*" class="inp flex-1">
+      <img id="spv" src="${esc(u.signature||'')}" class="${u.signature?'':'hidden'} h-16 object-contain border rounded-xl bg-slate-50 px-2"></div></div>
+    <div class="md:col-span-2 flex justify-end"><button class="btn btn-p"><i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล</button></div>
+  </form>`);
+  previewInput($('#pf'),$('#ppv')); previewInput($('#sf'),$('#spv'));
+  $('#fP').onsubmit=async e=>{e.preventDefault();spin(true);
+    const d={id:u.id,username:$('#pu').value.trim(),password:$('#pp').value,fullname:$('#pn').value.trim(),position:$('#ppos').value.trim(),
+      photo:$('#ppv').src.startsWith('data:')?$('#ppv').src:u.photo, signature:$('#spv').src.startsWith('data:')?$('#spv').src:u.signature};
+    let saved; try{ saved = await api.saveUser(d); }catch(err){ return; }
+    Object.assign(S.user, saved || d); spin(false);
+    Swal.fire({icon:'success',title:'บันทึกข้อมูลสำเร็จ',confirmButtonColor:'#0C7C82'}).then(()=>renderShell());};
+}
+
+/* ======================================================================
+   10) SIGNATURE PAD
+====================================================================== */
+function signatureBlock(id,scanSrc){
+  return `<div class="rounded-2xl border border-slate-100 p-4 bg-slate-50/60">
+    <p class="lbl">ลงชื่อ</p>
+    <div class="flex gap-4 mb-3 text-sm">
+      <label class="flex items-center gap-2"><input type="radio" name="${id}_mode" value="scan" class="accent-brand-500" checked> ลายเซ็นสแกน</label>
+      <label class="flex items-center gap-2"><input type="radio" name="${id}_mode" value="draw" class="accent-brand-500"> ลายเซ็นสด</label>
+    </div>
+    <div id="${id}_scan" class="bg-white rounded-xl border border-dashed border-slate-200 h-32 grid place-items-center">
+      ${scanSrc?`<img src="${esc(scanSrc)}" class="h-28 object-contain">`:`<p class="text-slate-300 text-sm"><i class="fa-regular fa-image"></i> ยังไม่มีรูปลายเซ็น (อัพโหลดที่เมนูข้อมูลส่วนตัว)</p>`}
+    </div>
+    <div id="${id}_draw" class="hidden">
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <canvas id="${id}_cv" height="140" class="w-full touch-none block"></canvas>
+      </div>
+      <button type="button" id="${id}_clr" class="btn btn-g text-xs mt-2"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็น</button>
+    </div></div>`;
+}
+function initSignature(id,scanSrc){
+  const wrapS=document.getElementById(id+'_scan'), wrapD=document.getElementById(id+'_draw'), cv=document.getElementById(id+'_cv');
+  const ctx=cv.getContext('2d'); let drawing=false, dirty=false;
+  const fit=()=>{const r=cv.getBoundingClientRect();cv.width=r.width||600;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.strokeStyle='#0f172a';};
+  setTimeout(fit,60); window.addEventListener('resize',fit);
+  const pos=e=>{const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};};
+  const start=e=>{drawing=true;dirty=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault();};
+  const move =e=>{if(!drawing)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault();};
+  const end  =()=>drawing=false;
+  ['mousedown','touchstart'].forEach(ev=>cv.addEventListener(ev,start));
+  ['mousemove','touchmove'].forEach(ev=>cv.addEventListener(ev,move));
+  ['mouseup','mouseleave','touchend'].forEach(ev=>cv.addEventListener(ev,end));
+  document.getElementById(id+'_clr').onclick=()=>{ctx.clearRect(0,0,cv.width,cv.height);dirty=false;};
+  document.querySelectorAll(`input[name="${id}_mode"]`).forEach(r=>r.onchange=()=>{
+    const d=r.value==='draw'&&r.checked; wrapD.classList.toggle('hidden',!d); wrapS.classList.toggle('hidden',d); if(d)fit();});
+  return ()=>{ const mode=document.querySelector(`input[name="${id}_mode"]:checked`).value;
+    if(mode==='draw') return dirty?cv.toDataURL('image/png'):'';
+    return scanSrc||''; };
+}
+
+/* ======================================================================
+   11) EMPLOYEE : LEAVE REQUEST FORM
+====================================================================== */
+async function pageRequest(c,editId=null){
+  const st=DB.settings||{}, cy=currentYear(), u=S.user;
+  let all=[]; try{ all=await api.leaves(); }catch(e){ return; }
+  const mine=all.filter(l=>String(l.userId)===String(u.id)).sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
+  const last=mine.filter(l=>String(l.id)!==String(editId))[0];
+  const edit=editId?all.find(l=>String(l.id)===String(editId)):null;
+
+  c.innerHTML=`<div class="space-y-4">
+  ${box(edit?'แก้ไขใบขออนุญาตลา':'แบบใบขออนุญาตลา','fa-file-signature',`
+  <form id="fL" class="p-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div><label class="lbl">เขียนที่</label><input class="inp bg-slate-50" value="${esc(st.cityName||'')}" readonly></div>
+      <div><label class="lbl">วันที่</label><input id="qDate" type="date" class="inp" value="${edit?.docDate||new Date().toISOString().slice(0,10)}" required></div>
+      <div class="md:col-span-2"><label class="lbl">เรื่อง</label><input id="qSub" class="inp" value="${esc(edit?.subject||'')}" placeholder="เช่น ขออนุญาตลาป่วย" required></div>
+    </div>
+    <div class="rounded-2xl bg-brand-50/60 p-4 text-sm">เรียน &nbsp;<b class="text-brand-600">ผู้อำนวยการส่วนปกครอง / หัวหน้าสำนักปลัดเมืองพัทยา</b></div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div><label class="lbl">ข้าพเจ้า</label><input class="inp bg-slate-50" value="${esc(u.fullname)}" readonly></div>
+      <div><label class="lbl">ตำแหน่ง</label><input class="inp bg-slate-50" value="${esc(u.position||'-')}" readonly></div>
+      <div><label class="lbl">สังกัด</label><input class="inp bg-slate-50" value="${esc((st.dept||'')+' '+(st.office||''))}" readonly></div>
+    </div>
+    <div><label class="lbl">ขอลา</label>
+      <div class="grid sm:grid-cols-3 gap-3">${LEAVE_TYPES.map(t=>`
+        <label class="cursor-pointer"><input type="radio" name="qType" value="${t.k}" class="peer hidden" ${edit?.type===t.k?'checked':''} required>
+        <div class="px-4 py-3 rounded-xl border border-slate-200 text-center text-sm font-semibold peer-checked:bg-brand-500 peer-checked:text-white peer-checked:border-brand-500 transition">${t.t}</div></label>`).join('')}</div></div>
+    <div><label class="lbl">เนื่องจาก</label><textarea id="qReason" class="inp" rows="2" required>${esc(edit?.reason||'')}</textarea></div>
+    <div class="grid sm:grid-cols-3 gap-4">
+      <div><label class="lbl">ตั้งแต่วันที่</label><input id="qS" type="date" class="inp" value="${edit?.startDate||''}" required></div>
+      <div><label class="lbl">ถึงวันที่</label><input id="qE" type="date" class="inp" value="${edit?.endDate||''}" required></div>
+      <div><label class="lbl">มีกำหนด (วัน)</label><input id="qD" class="inp bg-brand-50 font-bold text-brand-600 text-center" value="${edit?.days||0}" readonly></div>
+    </div>
+    <div class="rounded-2xl border border-slate-100 p-4">
+      <p class="lbl">ข้าพเจ้าได้ลา (ครั้งสุดท้าย)</p>
+      <div class="flex flex-wrap gap-4 text-sm mb-3">${LEAVE_TYPES.map(t=>`
+        <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4 accent-brand-500" disabled ${last?.type===t.k?'checked':''}> ${t.t}</label>`).join('')}</div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div><label class="lbl">ตั้งแต่วันที่</label><input class="inp bg-slate-50" value="${last?toTHs(last.startDate):'-'}" readonly></div>
+        <div><label class="lbl">ถึงวันที่</label><input class="inp bg-slate-50" value="${last?toTHs(last.endDate):'-'}" readonly></div>
+        <div><label class="lbl">มีกำหนด</label><input class="inp bg-slate-50" value="${last?last.days+' วัน':'-'}" readonly></div>
+      </div></div>
+    <div><label class="lbl">ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่</label><input id="qContact" class="inp" value="${esc(edit?.contact||'')}" required></div>
+    <p class="text-right text-sm text-slate-500 pr-4">ขอแสดงความนับถือ</p>
+    ${signatureBlock('sig',u.signature)}
+    <div class="text-center text-sm"><p class="font-semibold">(${esc(u.fullname)})</p><p class="text-slate-400">${esc(u.position||'-')}</p></div>
+
+    <div class="rounded-2xl border border-slate-100 overflow-hidden">
+      <div class="px-4 py-3 bg-slate-50 font-semibold text-sm text-slate-600">สถิติการลาในปีงบประมาณ ${esc(cy?.name||'-')}</div>
+      <div class="overflow-x-auto"><table class="data w-full text-sm">
+        <thead class="bg-white text-slate-500 border-b border-slate-100"><tr>
+          <th class="px-4 py-2 text-left">ประเภทการลา</th><th class="px-4 py-2 text-center">ลามาแล้ว (วัน)</th>
+          <th class="px-4 py-2 text-center">ลาครั้งนี้ (วัน)</th><th class="px-4 py-2 text-center">รวมเป็น (วัน)</th></tr></thead>
+        <tbody id="statBody" class="divide-y divide-slate-100"></tbody></table></div></div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <button type="button" id="qCancel" class="btn btn-g">ยกเลิก</button>
+      <button class="btn btn-p"><i class="fa-solid fa-paper-plane"></i> ยื่นบันทึกขออนุญาตลา</button></div>
+  </form>`)}</div>`;
+
+  const getSig=initSignature('sig',u.signature);
+  const approvedThisYear=mine.filter(l=>l.status==='approved'&&String(l.yearId)===String(cy?.id)&&String(l.id)!==String(editId));
+  const renderStat=()=>{
+    const type=document.querySelector('input[name="qType"]:checked')?.value;
+    const cur=+$('#qD').value||0;
+    $('#statBody').innerHTML=LEAVE_TYPES.map(t=>{
+      const past=approvedThisYear.filter(l=>l.type===t.k).reduce((s,l)=>s+l.days,0);
+      const now=type===t.k?cur:0;
+      return `<tr><td class="px-4 py-2.5 font-medium">${t.t}</td>
+        <td class="px-4 py-2.5 text-center">${past}</td>
+        <td class="px-4 py-2.5 text-center ${now?'text-orange2 font-bold':''}">${now||'-'}</td>
+        <td class="px-4 py-2.5 text-center font-bold text-brand-600">${past+now}</td></tr>`;}).join('');
+  };
+  const calc=()=>{ $('#qD').value=dayDiff($('#qS').value,$('#qE').value); renderStat(); };
+  $('#qS').onchange=calc; $('#qE').onchange=calc;
+  document.querySelectorAll('input[name="qType"]').forEach(r=>r.onchange=renderStat);
+  $('#qCancel').onclick=()=>{S.page='mylist';route();};
+  renderStat();
+
+  $('#fL').onsubmit=async e=>{
+    e.preventDefault();
+    const days=+$('#qD').value;
+    if(days<=0) return Swal.fire({icon:'warning',title:'วันที่ไม่ถูกต้อง',text:'กรุณาตรวจสอบวันที่เริ่มต้นและสิ้นสุด',confirmButtonColor:'#0C7C82'});
+    const sig=getSig(); if(!sig) return Swal.fire({icon:'warning',title:'ยังไม่มีลายเซ็น',text:'กรุณาเลือกลายเซ็นสแกน หรือเซ็นสดในช่องลายเซ็น',confirmButtonColor:'#0C7C82'});
+    const r=await confirmSwal('ยืนยันการยื่นใบลา?','ระบบจะส่งใบลาไปยังผู้อำนวยการเพื่อพิจารณา','question','ยืนยันยื่นใบลา');
+    if(!r.isConfirmed)return;
+    spin(true);
+    const start=$('#qS').value;
+    try{
+      await api.saveLeave({ id:edit?.id, userId:u.id,
+        snap:{fullname:u.fullname,position:u.position,signature:sig,photo:u.photo||''},
+        writtenAt:st.cityName||'', docDate:$('#qDate').value, subject:$('#qSub').value.trim(),
+        type:document.querySelector('input[name="qType"]:checked').value,
+        reason:$('#qReason').value.trim(), startDate:start, endDate:$('#qE').value, days,
+        lastLeave:last?{type:last.type,startDate:last.startDate,endDate:last.endDate,days:last.days}:null,
+        contact:$('#qContact').value.trim(), signature:sig,
+        yearId:cy?.id, yearName:cy?.name, round:roundOf(start,cy),
+        deptSnap:`${st.dept||''} ${st.office||''}`, status:edit?.status||'pending',
+        approver:edit?.approver||null });
+    }catch(err){ return; }
+    spin(false);
+    Swal.fire({icon:'success',title:'ยื่นใบลาสำเร็จ',text:'รอผู้อำนวยการพิจารณาอนุญาต',confirmButtonColor:'#0C7C82'})
+      .then(()=>{S.page='mylist';route();});
+  };
+}
+
+/* ======================================================================
+   12) EMPLOYEE : MY LEAVE LIST
+====================================================================== */
+async function pageMyList(c){
+  c.innerHTML=box('ข้อมูลขออนุญาตลา','fa-folder-open',
+    `<div class="overflow-x-auto"><table class="data w-full text-sm"><thead class="bg-slate-50 text-slate-500"><tr>
+      <th class="px-4 py-3 w-14 text-center">ลำดับ</th><th class="px-4 py-3 text-center">ปีงบประมาณ</th>
+      <th class="px-4 py-3 text-center">รอบที่</th><th class="px-4 py-3 text-center">ประเภทการลา</th>
+      <th class="px-4 py-3 text-center">กำหนดวัน</th><th class="px-4 py-3 text-center">สถานะ</th>
+      <th class="px-4 py-3 text-center w-40">จัดการ</th></tr></thead>
+      <tbody id="mBody" class="divide-y divide-slate-100">${skeletonRows(5,7)}</tbody></table></div>`,
+    `<button id="goReq" class="btn btn-p text-sm"><i class="fa-solid fa-plus"></i> ขออนุญาตลา</button>`);
+  $('#goReq').onclick=()=>{S.page='request';route();};
+  const load=async()=>{
+    let rows=[]; try{ rows=await api.leaves({userId:S.user.id}); }catch(e){ return; }
+    $('#mBody').innerHTML=rows.length?rows.map((l,i)=>`<tr class="hover:bg-slate-50/70">
+      <td class="px-4 py-3 text-center text-slate-400">${i+1}</td>
+      <td class="px-4 py-3 text-center font-semibold text-brand-600">${esc(l.yearName)}</td>
+      <td class="px-4 py-3 text-center">รอบที่ ${l.round}</td>
+      <td class="px-4 py-3 text-center">${typeBadge(l.type)}</td>
+      <td class="px-4 py-3 text-center font-semibold">${l.days} วัน</td>
+      <td class="px-4 py-3 text-center">${statusBadge(l.status)}</td>
+      <td class="px-4 py-3"><div class="flex justify-center gap-1">
+        <button class="ico-btn bg-blue2/10 text-blue2" data-view="${l.id}" title="ดูใบลา"><i class="fa-solid fa-eye"></i></button>
+        <button class="ico-btn bg-brand-50 text-brand-600" data-print="${l.id}" title="พิมพ์"><i class="fa-solid fa-print"></i></button>
+        <button class="ico-btn ${l.status==='pending'?'bg-amber2/20 text-orange2':'bg-slate-100 text-slate-300'}" ${l.status==='pending'?'':'disabled'} data-edit="${l.id}" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+        <button class="ico-btn ${l.status==='pending'?'bg-red3/10 text-red3':'bg-slate-100 text-slate-300'}" ${l.status==='pending'?'':'disabled'} data-del="${l.id}" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+      </div></td></tr>`).join('')
+      :`<tr><td colspan="7" class="px-4 py-12 text-center text-slate-400"><i class="fa-regular fa-folder-open text-2xl block mb-2"></i>ยังไม่มีใบลา</td></tr>`;
+    bindLeaveRowActions($('#mBody'),rows,load);
+    $('#mBody').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{
+      if(b.disabled) return;
+      S.page='request'; document.querySelectorAll('.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.p==='request'));
+      $('#pageTitle').textContent='ขออนุญาตลา'; $('#content').innerHTML=skeletonPage(); pageRequest($('#content'),b.dataset.edit); });
+  };
+  load();
+}
+
+/* ======================================================================
+   13) DIRECTOR : APPROVE
+====================================================================== */
+async function pageApprove(c){
+  c.innerHTML=box('รายการขออนุญาตลา','fa-stamp',
+    `<div class="overflow-x-auto"><table class="data w-full text-sm"><thead class="bg-slate-50 text-slate-500"><tr>
+      <th class="px-4 py-3 w-14 text-center">ลำดับ</th><th class="px-4 py-3 text-left">ชื่อ-นามสกุล</th>
+      <th class="px-4 py-3 text-center">รอบที่/ปีงบฯ</th><th class="px-4 py-3 text-center">ประเภทการลา</th>
+      <th class="px-4 py-3 text-center">กำหนดวัน</th><th class="px-4 py-3 text-center">สถานะ</th>
+      <th class="px-4 py-3 text-center w-36">จัดการ</th></tr></thead>
+      <tbody id="apBody" class="divide-y divide-slate-100">${skeletonRows(5,7)}</tbody></table></div>`);
+  const load=async()=>{
+    let rows=[]; try{ rows=await api.leaves(); }catch(e){ return; }
+    $('#apBody').innerHTML=rows.length?rows.map((l,i)=>`<tr class="hover:bg-slate-50/70">
+      <td class="px-4 py-3 text-center text-slate-400">${i+1}</td>
+      <td class="px-4 py-3 font-medium">${esc(l.snap?.fullname||'')}<div class="text-[11px] text-slate-400">${esc(l.snap?.position||'')}</div></td>
+      <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-lg bg-brand-50 text-brand-600 text-xs font-semibold">${l.round}/${esc(l.yearName)}</span></td>
+      <td class="px-4 py-3 text-center">${typeBadge(l.type)}</td>
+      <td class="px-4 py-3 text-center font-semibold">${l.days} วัน</td>
+      <td class="px-4 py-3 text-center">${statusBadge(l.status)}</td>
+      <td class="px-4 py-3"><div class="flex justify-center gap-1">
+        <button class="ico-btn bg-blue2/10 text-blue2" data-view="${l.id}"><i class="fa-solid fa-eye"></i></button>
+        <button class="ico-btn bg-teal2/15 text-teal2" data-ap="${l.id}" title="พิจารณา"><i class="fa-solid fa-stamp"></i></button>
+        <button class="ico-btn bg-brand-50 text-brand-600" data-print="${l.id}"><i class="fa-solid fa-print"></i></button></div></td></tr>`).join('')
+      :`<tr><td colspan="7" class="px-4 py-12 text-center text-slate-400"><i class="fa-regular fa-folder-open text-2xl block mb-2"></i>ยังไม่มีรายการ</td></tr>`;
+    $('#apBody').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>viewLeave(rows.find(x=>String(x.id)===b.dataset.view)));
+    $('#apBody').querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>printLeave(rows.find(x=>String(x.id)===b.dataset.print)));
+    $('#apBody').querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>approveModal(rows.find(x=>String(x.id)===b.dataset.ap),load));
+  };
+  load();
+}
+function approveModal(l,done){
+  const d=S.user;
+  const m=openModal('พิจารณาอนุญาตการลา',`
+    <div class="space-y-4">
+      <div class="rounded-2xl bg-brand-50/60 p-4 text-sm grid sm:grid-cols-2 gap-2">
+        <p><span class="text-slate-500">ผู้ขอลา:</span> <b>${esc(l.snap?.fullname||'')}</b></p>
+        <p><span class="text-slate-500">ประเภท:</span> <b>${typeName(l.type)}</b></p>
+        <p><span class="text-slate-500">วันที่ลา:</span> ${toTHs(l.startDate)} - ${toTHs(l.endDate)}</p>
+        <p><span class="text-slate-500">มีกำหนด:</span> <b>${l.days} วัน</b></p>
+      </div>
+      <div><label class="lbl">ความคิดเห็น</label><textarea id="apCm" class="inp" rows="2" placeholder="ความคิดเห็นของผู้บังคับบัญชา">${esc(l.approver?.comment||'')}</textarea></div>
+      <div><label class="lbl">ผลการพิจารณา</label><div class="grid grid-cols-2 gap-3">
+        <label class="cursor-pointer"><input type="radio" name="apSt" value="approved" class="peer hidden" checked>
+          <div class="px-4 py-3 rounded-xl border border-slate-200 text-center text-sm font-semibold peer-checked:bg-teal2 peer-checked:text-white peer-checked:border-teal2">อนุญาต</div></label>
+        <label class="cursor-pointer"><input type="radio" name="apSt" value="rejected" class="peer hidden">
+          <div class="px-4 py-3 rounded-xl border border-slate-200 text-center text-sm font-semibold peer-checked:bg-red3 peer-checked:text-white peer-checked:border-red3">ไม่อนุญาต</div></label>
+      </div></div>
+      ${signatureBlock('dsig',d.signature)}
+      <div class="text-center text-sm"><p class="font-semibold">(${esc(d.fullname)})</p><p class="text-slate-400">${esc(d.position||'-')}</p></div>
+    </div>`,
+    `<button class="btn btn-g" data-close>ยกเลิก</button><button class="btn btn-p" id="okAp"><i class="fa-solid fa-floppy-disk"></i> บันทึกอนุญาตลา</button>`);
+  const getSig=initSignature('dsig',d.signature);
+  m.querySelector('#okAp').onclick=async()=>{
+    const sig=getSig(); if(!sig) return Swal.fire({icon:'warning',title:'ยังไม่มีลายเซ็น',confirmButtonColor:'#0C7C82'});
+    const status=m.querySelector('input[name="apSt"]:checked').value;
+    const r=await confirmSwal('ยืนยันผลการพิจารณา?',status==='approved'?'บันทึกเป็น "อนุญาต"':'บันทึกเป็น "ไม่อนุญาต"','question','บันทึก');
+    if(!r.isConfirmed)return; spin(true);
+    try{
+      await api.saveLeave({id:l.id,status,approver:{name:d.fullname,position:d.position,signature:sig,
+        comment:m.querySelector('#apCm').value.trim(),date:new Date().toISOString().slice(0,10)}});
+    }catch(e){ return; }
+    spin(false);m.remove();toast('success','บันทึกผลการพิจารณาสำเร็จ');done();};
+}
+
+/* ======================================================================
+   14) VIEW + PRINT
+====================================================================== */
+function leaveHTML(l){
+  const st=DB.settings||{};
+  return `<div class="text-sm leading-relaxed space-y-3">
+    <div class="text-center mb-4">
+      ${st.logo?`<img src="${esc(st.logo)}" class="w-16 h-16 object-contain mx-auto mb-2">`:''}
+      <h3 class="font-bold text-lg">แบบใบลาป่วย ลากิจส่วนตัว ลาคลอดบุตร</h3></div>
+    <div class="text-right">เขียนที่ ${esc(l.writtenAt)}<br>วันที่ ${toTH(l.docDate)}</div>
+    <p><b>เรื่อง</b> ${esc(l.subject)}</p>
+    <p><b>เรียน</b> ผู้อำนวยการส่วนปกครอง / หัวหน้าสำนักปลัดเมืองพัทยา</p>
+    <p class="indent-12">ข้าพเจ้า <b>${esc(l.snap?.fullname||'')}</b> ตำแหน่ง ${esc(l.snap?.position||'-')} สังกัด ${esc(l.deptSnap||'')}
+      ขอลา <b>${typeName(l.type)}</b> เนื่องจาก ${esc(l.reason)}
+      ตั้งแต่วันที่ ${toTH(l.startDate)} ถึงวันที่ ${toTH(l.endDate)} มีกำหนด <b>${l.days} วัน</b></p>
+    <p class="indent-12">ข้าพเจ้าได้ลา ${l.lastLeave?`<b>${typeName(l.lastLeave.type)}</b> ครั้งสุดท้ายตั้งแต่วันที่ ${toTH(l.lastLeave.startDate)} ถึงวันที่ ${toTH(l.lastLeave.endDate)} มีกำหนด ${l.lastLeave.days} วัน`:'— ไม่มีประวัติการลาก่อนหน้า —'}
+      ในระหว่างลาจะติดต่อข้าพเจ้าได้ที่ ${esc(l.contact)}</p>
+    <div class="text-center mt-6">
+      <p>ขอแสดงความนับถือ</p>
+      ${l.signature?`<img src="${esc(l.signature)}" class="h-16 mx-auto object-contain">`:'<div class="h-16"></div>'}
+      <p>(${esc(l.snap?.fullname||'')})</p><p class="text-slate-500">${esc(l.snap?.position||'-')}</p></div>
+    <table class="w-full border border-slate-300 text-xs mt-4">
+      <thead><tr class="bg-slate-100">
+        <th class="border border-slate-300 py-1">ประเภทการลา</th><th class="border border-slate-300 py-1">ลามาแล้ว</th>
+        <th class="border border-slate-300 py-1">ลาครั้งนี้</th><th class="border border-slate-300 py-1">รวมเป็น</th></tr></thead>
+      <tbody>${LEAVE_TYPES.map(t=>{
+        const past=(DB.leaves||[]).filter(x=>String(x.userId)===String(l.userId)&&String(x.yearId)===String(l.yearId)&&x.status==='approved'&&x.type===t.k&&String(x.id)!==String(l.id)).reduce((s,x)=>s+x.days,0);
+        const now=l.type===t.k?l.days:0;
+        return `<tr><td class="border border-slate-300 py-1 px-2">${t.t}</td>
+          <td class="border border-slate-300 py-1 text-center">${past}</td>
+          <td class="border border-slate-300 py-1 text-center">${now||'-'}</td>
+          <td class="border border-slate-300 py-1 text-center">${past+now}</td></tr>`;}).join('')}</tbody></table>
+    <div class="mt-5 border-t border-dashed border-slate-300 pt-4">
+      <p><b>ความคิดเห็นผู้บังคับบัญชา:</b> ${esc(l.approver?.comment||'-')}</p>
+      <p class="mt-1"><b>คำสั่ง:</b> ${l.status==='approved'?'อนุญาต':l.status==='rejected'?'ไม่อนุญาต':'รออนุญาต'}</p>
+      <div class="text-center mt-4">
+        ${l.approver?.signature?`<img src="${esc(l.approver.signature)}" class="h-16 mx-auto object-contain">`:'<div class="h-14"></div>'}
+        <p>(${esc(l.approver?.name||'.......................................')})</p>
+        <p class="text-slate-500">${esc(l.approver?.position||'ผู้อำนวยการส่วนปกครอง / หัวหน้าสำนักปลัดเมืองพัทยา')}</p>
+        ${l.approver?.date?`<p class="text-xs text-slate-400">วันที่ ${toTH(l.approver.date)}</p>`:''}</div>
+    </div></div>`;
+}
+function viewLeave(l){ if(!l)return; openModal('รายละเอียดใบลา',leaveHTML(l),
+  `<button class="btn btn-g" data-close>ปิด</button><button class="btn btn-p" onclick='printLeave(${JSON.stringify(String(l.id))})'><i class="fa-solid fa-print"></i> พิมพ์ใบลา</button>`,'max-w-3xl'); }
+function printLeave(x){
+  const l = typeof x==='string' ? (DB.leaves||[]).find(i=>String(i.id)===x) : x; if(!l) return;
+  const w=window.open('','_blank','width=900,height=900');
+  w.document.write(`<html><head><meta charset="UTF-8"><title>ใบลา-${esc(l.snap?.fullname||'')}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>body{font-family:'Sarabun',sans-serif;padding:28px 40px}@page{size:A4;margin:14mm}</style></head>
+    <body><div id="printArea">${leaveHTML(l)}</div>
+    <script>window.onload=()=>setTimeout(()=>{window.print();},800)<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ======================================================================
+   15) BOOT
+====================================================================== */
+(async ()=>{
+  spin(true);
+  try{ await api.bootstrap(); }catch(e){ /* แจ้งเตือนแล้วใน call() */ }
+  spin(false);
+  renderLogin();
+})();
+</script>
+</body>
+</html>
